@@ -10,10 +10,12 @@ from nltk import sent_tokenize
 from nltk import wordpunct_tokenize
 from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
 
+from sklearn.base import BaseEstimator,TransformerMixin
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.base import BaseEstimator,TransformerMixin
+from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
+from copied_project.src.text_normalizer import TextNormalizer
 
 # dictionary to determine voice of PRON's in MEMINCIDENTREPORT
 PRON_DICT = {'first': ['I', 'i', 'me', 'my', 'mine','myself'],
@@ -35,9 +37,7 @@ class FormatEstimator(BaseEstimator, TransformerMixin):
     - Dropping duplicate rows
     - Subsetting the data to only include non NULL MEMINCIDENTREPORT rows'''
 
-    def __init__(self,
-                 path_ = os.path.join(DATA_PATH, 'raw', 'complaints-2021-08-30_12_09.csv')
-                 ):
+    def __init__(self, path_ = os.path.join(DATA_PATH, 'raw', 'complaints-2021-08-30_12_09.csv')):
         self.file_path = path_
         self.df = pd.DataFrame()
         self._create_df()
@@ -63,7 +63,7 @@ class FormatEstimator(BaseEstimator, TransformerMixin):
             # Convert spaces(' ') and dashes('-') to '_'
             newList.append(re.sub(' |-', '_', string).lower())
         df.rename(columns=dict(zip(df.columns, newList)), inplace=True)
-        return newList
+        return df
 
     # def _convert_column_snake_case(self, df):
     #     new_col = self.convert_to_underscore(df.columns)
@@ -94,13 +94,12 @@ class FeatureEngTransformer(BaseEstimator, TransformerMixin):
         x_prime = X.copy()
         # x_prime['normalized'] = x_prime.MEMINCIDENTREPORT.apply(lambda x_: self._normalize_text(x_))
 
-        x_prime['cnt_third_pron'] = x_prime.MEMINCIDENTREPORT.apply(lambda x_: self._is_third_pers_PRN(x_))
-        x_prime['cnt_first_pron'] = x_prime.MEMINCIDENTREPORT.apply(lambda x_: self._is_first_pers_PRN(x_))
-        x_prime['cnt_immediate_rela'] = x_prime.MEMINCIDENTREPORT.apply(lambda x_: self._is_relative_immediate(x_))
-        x_prime['cnt_dstnt_rela'] = x_prime.MEMINCIDENTREPORT.apply(lambda x_: self._is_relative_dist(x_))
-        x_prime['cnt_frnd'] = x_prime.MEMINCIDENTREPORT.apply(lambda x_: self._is_friend(x_))
-        x_prime['has_fine'] = x_prime.CURTICKETAMOUNT.apply(lambda x_: 1 if not x_ else 0)
-
+        x_prime['cnt_third_pron'] = x_prime.consumer_complaint_narrative.apply(lambda x_: self._is_third_pers_PRN(x_))
+        x_prime['cnt_first_pron'] = x_prime.consumer_complaint_narrative.apply(lambda x_: self._is_first_pers_PRN(x_))
+        x_prime['cnt_immediate_rela'] = x_prime.consumer_complaint_narrative.apply(lambda x_: self._is_relative_immediate(x_))
+        x_prime['cnt_dstnt_rela'] = x_prime.consumer_complaint_narrative.apply(lambda x_: self._is_relative_dist(x_))
+        x_prime['cnt_frnd'] = x_prime.consumer_complaint_narrative.apply(lambda x_: self._is_friend(x_))
+        # x_prime['has_fine'] = x_prime.consumer_complaint_narrative.apply(lambda x_: 1 if not x_ else 0)
 
         ttl_pron = x_prime.cnt_third_pron + x_prime.cnt_first_pron
         x_prime['pcnt_first_pron'] = round(x_prime.cnt_first_pron/ ttl_pron, 2)
@@ -216,9 +215,15 @@ class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
 base_format = FormatEstimator()
 df = base_format.df
-base_format.fit(df)
+# base_format.fit(df)
 df = base_format.transform(df)
 
+pipe = Pipeline(steps=[
+    ('feat_trans', FeatureEngTransformer())
+    ,('normalize', TextNormalizer())
+])
+
+pipe.transform(df)
 
 featTrans = FeatureEngTransformer()
 featTrans.fit(df)
@@ -235,7 +240,7 @@ first_person_tkt_dstnt = first_person[(first_person.CURTICKETAMOUNT >0) & (first
 
 
 # Assume third_person MEMINCIDENTREPORT is about someone OTHER than the author!
-third_person = xprime[xprime.pcnt_first_pron < .5]
+third_person = xprime[xprime.pcnt_first_pron < .25]
 
 third_person_tkt_rela = third_person[(third_person.CURTICKETAMOUNT >0) & (third_person.cnt_immediate_rela > 0)] # idx regarding rela []
 third_person_tkt_frnd = third_person[(third_person.CURTICKETAMOUNT >0) & (third_person.cnt_frnd > 0 )] # idx regarding frnd [1801, 6431, 8056]
@@ -248,6 +253,10 @@ pronoun_na[pronoun_na.CURTICKETAMOUNT >0].shape[0]/pronoun_na.shape[0] # 46%
 
 pron_na_wRelative = pronoun_na[(pronoun_na.cnt_immediate_rela > 0) | (pronoun_na.cnt_dstnt_rela > 0) | (pronoun_na.cnt_frnd > 0 )]
 pron_na_no_Relative = pronoun_na[(pronoun_na.cnt_immediate_rela == 0) & (pronoun_na.cnt_dstnt_rela == 0) & (pronoun_na.cnt_frnd == 0)]
+
+
+relative = xprime[(xprime.cnt_immediate_rela >0) | (xprime.cnt_dstnt_rela >0)]
+relative_high_count = relative[relative.cnt_immediate_rela>7]
 
 ################################################################################################
 sample1 = pronoun_na.sample(frac=.1, random_state=0) ############################################ This is where I left off

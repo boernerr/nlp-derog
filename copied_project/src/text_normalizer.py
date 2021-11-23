@@ -69,7 +69,7 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         """Generic fit func() to comply with SKLEARN."""
         return self
 
-    def transform(self,documents):
+    def transform(self, documents):
         """Generic transform func() to comply with SKLEARN."""
         for doc in documents:
             yield self.normalize(doc)
