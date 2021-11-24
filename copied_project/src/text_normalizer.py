@@ -6,10 +6,11 @@ from sklearn.base import BaseEstimator,TransformerMixin
 
 class TextNormalizer(BaseEstimator,TransformerMixin):
 
-    def __init__(self):
+    def __init__(self, text_col):
         self.language = 'english'
         self.stopwords = set(nltk.corpus.stopwords.words(self.language))
         self.lemmatizer = nltk.WordNetLemmatizer()
+        self.text_col = text_col
 
     def is_punct(self,token):
         return all(unicodedata.category(char).startswith('P') for char in token)
@@ -69,10 +70,13 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         """Generic fit func() to comply with SKLEARN."""
         return self
 
-    def transform(self, documents):
-        """Generic transform func() to comply with SKLEARN."""
-        for doc in documents:
-            yield self.normalize(doc)
+    def transform(self, X):
+        """Create a new column in X that is normalized version of self.text_col."""
+
+        X[self.text_col] = X[self.text_col].apply(lambda x: self.normalize(x))
+        return X
+        # for doc in X:
+        #     yield self.normalize(doc)
 
 
 # textnorm = TextNormalizer()

@@ -15,7 +15,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
-from copied_project.src.text_normalizer import TextNormalizer
+from copied_project.src import text_normalizer
+from importlib import reload
+reload(text_normalizer)
 
 # dictionary to determine voice of PRON's in MEMINCIDENTREPORT
 PRON_DICT = {'first': ['I', 'i', 'me', 'my', 'mine','myself'],
@@ -37,8 +39,8 @@ class FormatEstimator(BaseEstimator, TransformerMixin):
     - Dropping duplicate rows
     - Subsetting the data to only include non NULL MEMINCIDENTREPORT rows'''
 
-    def __init__(self, path_ = os.path.join(DATA_PATH, 'raw', 'complaints-2021-08-30_12_09.csv')):
-        self.file_path = path_
+    def __init__(self, file_path = os.path.join(DATA_PATH, 'raw', 'complaints-2021-08-30_12_09.csv')):
+        self.file_path = file_path
         self.df = pd.DataFrame()
         self._create_df()
 
@@ -58,17 +60,13 @@ class FormatEstimator(BaseEstimator, TransformerMixin):
         return x_prime
 
     def convert_to_underscore(self, df):
+        '''Convert column names to snake_case.'''
         newList = []
         for string in df.columns:
             # Convert spaces(' ') and dashes('-') to '_'
             newList.append(re.sub(' |-', '_', string).lower())
         df.rename(columns=dict(zip(df.columns, newList)), inplace=True)
         return df
-
-    # def _convert_column_snake_case(self, df):
-    #     new_col = self.convert_to_underscore(df.columns)
-    #     df.rename(columns=dict(zip(df.columns, new_col)), inplace=True)
-    #     return df
 
     def _create_df(self):
         df = pd.read_csv(self.file_path, engine='python')
@@ -80,9 +78,9 @@ class FeatureEngTransformer(BaseEstimator, TransformerMixin):
     - Computing percent of pronouns used in MEMINCIDENTREPORT that are 1st/3rd person.'''
 
     def __init__(self):
-        pass
+        self.name = 'feature_engineer'
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         return self
 
     def transform(self, X):
@@ -212,23 +210,45 @@ class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
         pass
 
+class OneHotVectorizer(BaseEstimator, TransformerMixin):
+
+    def __init__(self):
+        self.vectorizer = CountVectorizer(binary=True)
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        freqs = self.vectorizer.fit_transform(X)
+
+
 
 base_format = FormatEstimator()
 df = base_format.df
-# base_format.fit(df)
+
+base_format.fit(df)
 df = base_format.transform(df)
+df_sub = df.loc[:100].copy()
 
 pipe = Pipeline(steps=[
     ('feat_trans', FeatureEngTransformer())
-    ,('normalize', TextNormalizer())
+    ,('normalize', text_normalizer.TextNormalizer('consumer_complaint_narrative'))
 ])
 
-pipe.transform(df)
+pipe.fit(df_sub)
+df_sub_xprime = pipe.transform(df_sub)
 
-featTrans = FeatureEngTransformer()
-featTrans.fit(df)
 
-xprime = featTrans.transform(df)
+
+
+
+
+
+normalizer = text_normalizer.TextNormalizer('consumer_complaint_narrative')
+normalizer.fit(xprime)
+normalizer.transform(xprime)
+xprime
+
 
 # Assume first_person MEMINCIDENTREPORT is about the author!
 first_person = xprime[xprime.pcnt_first_pron > .5]
