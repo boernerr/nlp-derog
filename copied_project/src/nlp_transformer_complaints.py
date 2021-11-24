@@ -264,11 +264,10 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         """Create a new column in X that is normalized version of self.text_col."""
 
         X[self.text_col] = X[self.text_col].apply(lambda x: self.normalize(x))
-        X[self.text_col] = ''.join(i for i in X[self.text_col])
+        X[self.text_col] = X[self.text_col].apply(lambda x: [' '.join(i for i in x)])
         return X
         # for doc in X:
         #     yield self.normalize(doc)
-
 
 class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
@@ -323,7 +322,7 @@ df_sub = df.loc[:100].copy()
 
 pipe = Pipeline(steps=[
     ('feat_trans', FeatureEngTransformer())
-    ,('normalize', text_normalizer.TextNormalizer('consumer_complaint_narrative'))
+    ,('normalize', TextNormalizer('consumer_complaint_narrative'))
 ])
 
 pipe.fit(df_sub)
@@ -334,17 +333,6 @@ one_hot.fit(df_sub_xprime)
 one_hot.transform(df_sub_xprime)
 test = one_hot.vectorizer.fit_transform(df_sub_xprime['consumer_complaint_narrative_norm'])
 
-
-
-corpus = pd.Series([
-         'This is the first document.',
-         'This document is the second document.',
-         'And this is the third one.',
-         'Is this the first document?'
-])
-vectorizer = CountVectorizer()
-X = vectorizer.fit_transform(corpus)
-vectorizer.get_feature_names()
 
 
 
