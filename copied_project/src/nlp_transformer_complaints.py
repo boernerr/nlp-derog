@@ -2,8 +2,11 @@ import string
 import re
 import os
 import pandas as pd
+import unicodedata
 
 import nltk
+from nltk import pos_tag, wordpunct_tokenize
+from nltk.corpus import wordnet as wn
 from nltk.corpus.reader.api import CorpusReader
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk import sent_tokenize
@@ -15,9 +18,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
-from copied_project.src import text_normalizer
-from importlib import reload
-reload(text_normalizer)
+# from copied_project.src import text_normalizer
+# from importlib import reload
+# reload(text_normalizer)
 
 # dictionary to determine voice of PRON's in MEMINCIDENTREPORT
 PRON_DICT = {'first': ['I', 'i', 'me', 'my', 'mine','myself'],
@@ -191,6 +194,82 @@ class FeatureEngTransformer(BaseEstimator, TransformerMixin):
         # instances = re.findall(regex, str_)
         return len(re.findall(regex, str_) )
 
+class TextNormalizer(BaseEstimator,TransformerMixin):
+
+    def __init__(self, text_col):
+        self.language = 'english'
+        self.stopwords = set(nltk.corpus.stopwords.words(self.language))
+        self.lemmatizer = nltk.WordNetLemmatizer()
+        self.text_col = text_col
+
+    def is_punct(self,token):
+        return all(unicodedata.category(char).startswith('P') for char in token)
+
+    def is_stopword(self,token):
+        return token.lower() in self.stopwords
+
+    # def _normalize_old(self, document):
+    #     """Normalize the text by lemmatization by removing stopwords and punct."""
+    #     document = pos_tag(wordpunct_tokenize(document))
+    #     return [self.lemmatize(token, tag).lower()
+    #             for sentence in document
+    #             for (token,tag) in sentence
+    #             if not self.is_punct(token) and not self.is_stopword(token)
+    #     ]
+
+    def normalize(self, document):
+        """
+        Normalize the text by lemmatization by removing stopwords and punct.
+        This function should be implemented by:
+        pd.Series.apply(lambda x: normalize(x))
+
+        Param
+        -----
+        document : pd.Series
+            In this case, we are applying normalize() to a pd.Series in a pd.DataFrame. Each row, then, is a distinct 'document'.
+            The pd.Series in question should be one long string.
+
+        """
+        doc = pos_tag(wordpunct_tokenize(document))
+        # j[0] = token, j[1] = tag
+        return [self.lemmatize(j[0].lower(), j[1]) for j in [k for k in doc]
+                if not self.is_punct(j[0]) and not self.is_stopword(j[0])]
+
+    def lemmatize(self, token, pos_tag):
+        """
+        Maps nltk.pos_tag to WordNet tag equivalent.
+        Assumes a (token, pos_tag) tuple as input.
+
+        Param
+        -----
+        token : str
+            A token, i.e. a word
+        pos_tag : str
+            nltk PartOfSpeech tag
+        """
+        tag = {
+             'N': wn.NOUN,
+             'V': wn.VERB,
+             'R': wn.ADV,
+             'J': wn.ADJ
+         }.get(pos_tag[0], wn.NOUN)
+
+        return self.lemmatizer.lemmatize(token, tag)
+
+    def fit(self, X, y=None):
+        """Generic fit func() to comply with SKLEARN."""
+        return self
+
+    def transform(self, X):
+        """Create a new column in X that is normalized version of self.text_col."""
+
+        X[self.text_col] = X[self.text_col].apply(lambda x: self.normalize(x))
+        X[self.text_col] = ''.join(i for i in X[self.text_col])
+        return X
+        # for doc in X:
+        #     yield self.normalize(doc)
+
+
 class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
     CODIFY_DICT = {
@@ -211,15 +290,27 @@ class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
         pass
 
 class OneHotVectorizer(BaseEstimator, TransformerMixin):
+    '''Class for one-hotting words(i.e. features) into an array.'''
 
-    def __init__(self):
-        self.vectorizer = CountVectorizer(binary=True)
+    def __init__(self, text_col):
+        self.vectorizer = CountVectorizer(input='content', decode_error='ignore', binary=True)
+        self.text_col = text_col
 
     def fit(self, X, y=None):
+        '''Generic fit function.'''
+
         return self
 
     def transform(self, X):
-        freqs = self.vectorizer.fit_transform(X)
+        '''Vectorize self.text_col into an array of arrays. '''
+
+        # This works, BUT only vectorizes individual rows. Meaning, it doesn't make one big array vectorizing the entire corpus
+        # X['freq_vector'] = X[self.text_col].apply(lambda x: self.vectorizer.fit_transform(x))
+        # return X
+        X[self.text_col]
+        freqs = self.vectorizer.fit_transform(X[self.text_col])
+        return freqs
+
 
 
 
@@ -238,9 +329,30 @@ pipe = Pipeline(steps=[
 pipe.fit(df_sub)
 df_sub_xprime = pipe.transform(df_sub)
 
+one_hot = OneHotVectorizer('consumer_complaint_narrative_norm')
+one_hot.fit(df_sub_xprime)
+one_hot.transform(df_sub_xprime)
+test = one_hot.vectorizer.fit_transform(df_sub_xprime['consumer_complaint_narrative_norm'])
 
 
 
+corpus = pd.Series([
+         'This is the first document.',
+         'This document is the second document.',
+         'And this is the third one.',
+         'Is this the first document?'
+])
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(corpus)
+vectorizer.get_feature_names()
+
+
+
+
+one_hot.fit_transform(df_sub_xprime)
+
+one_hot.vectorizer.get_feature_names()
+df_sub_xprime['freq_vector'].loc[0].toarray()[0]
 
 
 

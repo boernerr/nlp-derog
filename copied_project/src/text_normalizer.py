@@ -74,6 +74,7 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         """Create a new column in X that is normalized version of self.text_col."""
 
         X[self.text_col] = X[self.text_col].apply(lambda x: self.normalize(x))
+        X[self.text_col] = ''.join(i for i in X[self.text_col])
         return X
         # for doc in X:
         #     yield self.normalize(doc)
