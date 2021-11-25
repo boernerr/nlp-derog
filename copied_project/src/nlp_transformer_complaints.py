@@ -5,7 +5,9 @@ import pandas as pd
 import unicodedata
 
 import nltk
+import nltk.cluster.util
 from nltk import pos_tag, wordpunct_tokenize
+from nltk.cluster import KMeansClusterer
 from nltk.corpus import wordnet as wn
 from nltk.corpus.reader.api import CorpusReader
 from nltk.corpus.reader.api import CategorizedCorpusReader
@@ -13,11 +15,16 @@ from nltk import sent_tokenize
 from nltk import wordpunct_tokenize
 from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
 
-from sklearn.base import BaseEstimator,TransformerMixin
+
+
+from sklearn.base import BaseEstimator,TransformerMixin, clone
+from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
+from copied_project.src import k_means_nlp
+from copied_project.src.kMeans_positions import KMeansEstimator
 # from copied_project.src import text_normalizer
 # from importlib import reload
 # reload(text_normalizer)
@@ -295,8 +302,44 @@ class OneHotVectorizer(BaseEstimator, TransformerMixin):
         freqs = self.vectorizer.fit_transform(X[self.text_col])
         return [freq.toarray()[0] for freq in freqs]
 
+class KMeansEstimator(BaseEstimator, TransformerMixin):
 
+    def __init__(self, k=25):
+        # self.k_means=k_means
+        self.k = k
+        self.clusterer = KMeans(n_clusters=k, random_state=0)
 
+    def fit(self, X, y=None):
+        '''This can have some basic transformations on X. '''
+        self.clusterer_ = clone(self.clusterer) # This is following sklearn convention with trailing '_'
+        self.clusterer.fit(X)
+        return self
+
+    def transform(self, X):
+        '''let's try return self to see if this gets rid of the AttributeError.'''
+        return self
+
+    def predict(self, X):
+        return self.clusterer.predict(X)
+
+    # def score(self):
+    #     '''Is this needed???'''
+    #     pass
+
+class KMeansClusters(BaseEstimator, TransformerMixin):
+
+    def __init__(self, k=7):
+        self.k = k
+        self.distance = nltk.cluster.util.cosine_distance
+        self.model = KMeansClusterer(self.k, self.distance,
+                                     avoid_empty_clusters=True)
+
+    def fit(self, documents, labels=None):
+        return self
+
+    def transform(self, documents):
+        """Fits k-means to one-ht encoded vectorize documents."""
+        return self.model.cluster(documents, assign_clusters=True)
 
 base_format = FormatEstimator()
 df = base_format.df
@@ -309,11 +352,19 @@ pipe = Pipeline(steps=[
     ('feat_trans', FeatureEngTransformer())
     ,('normalize', TextNormalizer('consumer_complaint_narrative'))
     ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
+    # ,('kmeans', KMeansEstimator(k=3))# Not this kmeans estimator, for some reason it doesn't work correctly.
+    ,('kmeans',k_means_nlp.KMeansClusters(10) )
 ])
 
 pipe.fit(df_sub)
-test_list = pipe.transform(df_sub) # This should be the list of arrays from output of pipe.one_hot
-# df_sub_xprime = pipe.transform(df_sub)
+clusters = pipe.transform(df_sub)
+# clusters = pipe.predict(df_sub)
+
+df_sub['predictions'] = clusters
+df_sub['predictions'].value_counts()
+# test_list = pipe.transform(df_sub) # This should be the list of arrays from output of pipe.one_hot; It IS
+# df_sub_xprime = pipe['one_hot'].transform(df_sub)
+df_sub_xprime.issue.value_counts() # using this to gauge number of distinct clusters present; we'll use 10 for starters
 
 one_hot = OneHotVectorizer('consumer_complaint_narrative')
 one_hot.vectorizer.get_feature_names()
