@@ -264,7 +264,7 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         """Create a new column in X that is normalized version of self.text_col."""
 
         X[self.text_col] = X[self.text_col].apply(lambda x: self.normalize(x))
-        X[self.text_col] = X[self.text_col].apply(lambda x: [' '.join(i for i in x)])
+        X[self.text_col] = X[self.text_col].apply(lambda x: ' '.join(i for i in x))
         return X
         # for doc in X:
         #     yield self.normalize(doc)
@@ -328,10 +328,10 @@ pipe = Pipeline(steps=[
 pipe.fit(df_sub)
 df_sub_xprime = pipe.transform(df_sub)
 
-one_hot = OneHotVectorizer('consumer_complaint_narrative_norm')
+one_hot = OneHotVectorizer('consumer_complaint_narrative')
 one_hot.fit(df_sub_xprime)
 one_hot.transform(df_sub_xprime)
-test = one_hot.vectorizer.fit_transform(df_sub_xprime['consumer_complaint_narrative_norm'])
+test = one_hot.vectorizer.fit_transform(df_sub_xprime['consumer_complaint_narrative'])
 
 
 
