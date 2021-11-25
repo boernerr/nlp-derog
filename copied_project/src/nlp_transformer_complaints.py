@@ -208,15 +208,6 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
     def is_stopword(self,token):
         return token.lower() in self.stopwords
 
-    # def _normalize_old(self, document):
-    #     """Normalize the text by lemmatization by removing stopwords and punct."""
-    #     document = pos_tag(wordpunct_tokenize(document))
-    #     return [self.lemmatize(token, tag).lower()
-    #             for sentence in document
-    #             for (token,tag) in sentence
-    #             if not self.is_punct(token) and not self.is_stopword(token)
-    #     ]
-
     def normalize(self, document):
         """
         Normalize the text by lemmatization by removing stopwords and punct.
@@ -261,13 +252,11 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         return self
 
     def transform(self, X):
-        """Create a new column in X that is normalized version of self.text_col."""
+        """Modify the specified text_col by normalizing it. Then convert it from a list to one big string."""
 
         X[self.text_col] = X[self.text_col].apply(lambda x: self.normalize(x))
         X[self.text_col] = X[self.text_col].apply(lambda x: ' '.join(i for i in x))
         return X
-        # for doc in X:
-        #     yield self.normalize(doc)
 
 class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
@@ -289,7 +278,7 @@ class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
         pass
 
 class OneHotVectorizer(BaseEstimator, TransformerMixin):
-    '''Class for one-hotting words(i.e. features) into an array.'''
+    '''Class for one-hotting words(i.e. features) into an array in order to feed to a model downstream.'''
 
     def __init__(self, text_col):
         self.vectorizer = CountVectorizer(input='content', decode_error='ignore', binary=True)
@@ -301,12 +290,8 @@ class OneHotVectorizer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        '''Vectorize self.text_col into an array of arrays. '''
+        '''Vectorize self.text_col into an array of arrays. This is so we can feed the AoA to a model. '''
 
-        # This works, BUT only vectorizes individual rows. Meaning, it doesn't make one big array vectorizing the entire corpus
-        # X['freq_vector'] = X[self.text_col].apply(lambda x: self.vectorizer.fit_transform(x))
-        # return X
-        # X[self.text_col]
         freqs = self.vectorizer.fit_transform(X[self.text_col])
         return [freq.toarray()[0] for freq in freqs]
 
