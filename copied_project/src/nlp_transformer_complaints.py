@@ -306,9 +306,9 @@ class OneHotVectorizer(BaseEstimator, TransformerMixin):
         # This works, BUT only vectorizes individual rows. Meaning, it doesn't make one big array vectorizing the entire corpus
         # X['freq_vector'] = X[self.text_col].apply(lambda x: self.vectorizer.fit_transform(x))
         # return X
-        X[self.text_col]
+        # X[self.text_col]
         freqs = self.vectorizer.fit_transform(X[self.text_col])
-        return freqs
+        return [freq.toarray()[0] for freq in freqs]
 
 
 
@@ -323,15 +323,15 @@ df_sub = df.loc[:100].copy()
 pipe = Pipeline(steps=[
     ('feat_trans', FeatureEngTransformer())
     ,('normalize', TextNormalizer('consumer_complaint_narrative'))
+    ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
 ])
 
 pipe.fit(df_sub)
-df_sub_xprime = pipe.transform(df_sub)
+test_list = pipe.transform(df_sub) # This should be the list of arrays from output of pipe.one_hot
+# df_sub_xprime = pipe.transform(df_sub)
 
 one_hot = OneHotVectorizer('consumer_complaint_narrative')
-one_hot.fit(df_sub_xprime)
-one_hot.transform(df_sub_xprime)
-test = one_hot.vectorizer.fit_transform(df_sub_xprime['consumer_complaint_narrative'])
+one_hot.vectorizer.get_feature_names()
 
 
 
