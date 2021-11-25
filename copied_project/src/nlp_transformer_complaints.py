@@ -327,6 +327,7 @@ class KMeansEstimator(BaseEstimator, TransformerMixin):
     #     pass
 
 class KMeansClusters(BaseEstimator, TransformerMixin):
+    '''Directly from the book, this KMeans instance is from nltk instead of directly from sklearn.'''
 
     def __init__(self, k=7):
         self.k = k
@@ -353,38 +354,21 @@ pipe = Pipeline(steps=[
     ,('normalize', TextNormalizer('consumer_complaint_narrative'))
     ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
     # ,('kmeans', KMeansEstimator(k=3))# Not this kmeans estimator, for some reason it doesn't work correctly.
-    ,('kmeans',k_means_nlp.KMeansClusters(10) )
+    ,('kmeans',KMeansClusters(10) )
 ])
 
 pipe.fit(df_sub)
 clusters = pipe.transform(df_sub)
-# clusters = pipe.predict(df_sub)
-
 df_sub['predictions'] = clusters
-df_sub['predictions'].value_counts()
-# test_list = pipe.transform(df_sub) # This should be the list of arrays from output of pipe.one_hot; It IS
-# df_sub_xprime = pipe['one_hot'].transform(df_sub)
-df_sub_xprime.issue.value_counts() # using this to gauge number of distinct clusters present; we'll use 10 for starters
 
-one_hot = OneHotVectorizer('consumer_complaint_narrative')
-one_hot.vectorizer.get_feature_names()
+# df_sub_xprime.issue.value_counts() # using this to gauge number of distinct clusters present; we'll use 10 for starters
+
+df_sub[df_sub.predictions == 0]['issue'].value_counts()
 
 
-
-
-
-one_hot.fit_transform(df_sub_xprime)
-
-one_hot.vectorizer.get_feature_names()
-df_sub_xprime['freq_vector'].loc[0].toarray()[0]
-
-
-
-normalizer = text_normalizer.TextNormalizer('consumer_complaint_narrative')
-normalizer.fit(xprime)
-normalizer.transform(xprime)
-xprime
-
+########################################################################################################################
+# Below is analysis of pronoun extraction
+########################################################################################################################
 
 # Assume first_person MEMINCIDENTREPORT is about the author!
 first_person = xprime[xprime.pcnt_first_pron > .5]
