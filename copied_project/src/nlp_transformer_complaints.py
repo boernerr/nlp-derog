@@ -24,6 +24,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
+from copied_project.src._util_plot_funcs import plot_dendrogram
 from copied_project.src import k_means_nlp
 from copied_project.src.kMeans_positions import KMeansEstimator
 # from copied_project.src import text_normalizer
@@ -388,6 +389,19 @@ hierarchy_pipe = Pipeline(steps=[
     ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
     ,('clusters', HierarchicalClusters() )
 ])
+
+hierarchy_pipe.fit(df_sub)
+clusters = hierarchy_pipe.transform(df_sub)
+hierarchy_pipe['clusters'].children
+children = hierarchy_pipe.named_steps['clusters'].children
+children[:][0]
+plot_dendrogram(children)
+# labels = hierarchy_pipe['clusters'].y # This is the the same as the clusters above. Therefore its not needed
+
+df_sub['predictions_hierarchy'] = clusters
+df_sub[df_sub.predictions_hierarchy==0].issue.value_counts()
+df_sub[df_sub.predictions_hierarchy==1].issue.value_counts()
+
 # df_sub_xprime.issue.value_counts() # using this to gauge number of distinct clusters present; we'll use 10 for starters
 # df_sub[df_sub.predictions == 0]['issue'].value_counts()
 
