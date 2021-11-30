@@ -20,10 +20,12 @@ from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
 from sklearn.base import BaseEstimator,TransformerMixin, clone
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
+from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
+from copied_project.src._util_plot_funcs import plot_dendrogram
 from copied_project.src import k_means_nlp
 from copied_project.src.kMeans_positions import KMeansEstimator
 # from copied_project.src import text_normalizer
@@ -266,6 +268,22 @@ class TextNormalizer(BaseEstimator,TransformerMixin):
         X[self.text_col] = X[self.text_col].apply(lambda x: ' '.join(i for i in x))
         return X
 
+class TextCountVectorizer(BaseEstimator, TransformerMixin):
+
+     def __init__(self, text_col):
+         self.text_col = text_col
+
+     def fit(self, X):
+        return self
+
+     def transform(self, X):
+        vectorizer = CountVectorizer(input='content')
+        X = vectorizer.fit_transform(X[self.text_col])
+        self.feature_names = vectorizer.get_feature_names()
+        return X
+
+
+
 class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
     CODIFY_DICT = {
@@ -361,6 +379,37 @@ class HierarchicalClusters( BaseEstimator, TransformerMixin):
 
         return clusters
 
+class SklearnTopicModels():
+    '''Class that wraps an LDA model in a pipeline.'''
+
+    def __init__(self, n_components=10):
+        self.n_components = n_components
+        self.model = Pipeline([
+            ('norm', TextNormalizer('consumer_complaint_narrative')),
+            ('vect', TextCountVectorizer(text_col='consumer_complaint_narrative' #tokenizer=identity,
+            )),
+            ('model', LatentDirichletAllocation(n_components=self.n_components))
+        ])
+
+    def fit_transform(self, X):
+        self.model.fit_transform(X)
+
+        return self.model
+
+    def get_topics(self, n=25):
+        vectorizer = self.model.named_steps['vect']
+        model = self.model.steps[-1][1]
+        names = vectorizer.feature_names
+        topics = dict()
+
+        for idx, topic in enumerate(model.components_):
+            features =topic.argsort()[:-(n - 1): -1]
+            tokens = [names[i] for i in features]
+            topics[idx] = tokens
+
+        return topics
+
+
 
 base_format = FormatEstimator()
 df = base_format.df
@@ -368,6 +417,23 @@ df = base_format.df
 base_format.fit(df)
 df = base_format.transform(df)
 df_sub = df.loc[:100].copy()
+
+cv = TextCountVectorizer('consumer_complaint_narrative')
+vectorizer = CountVectorizer(input='content')
+XX = vectorizer.fit_transform(df_sub['consumer_complaint_narrative'])
+# vectorizer.get_feature_names()
+# help(CountVectorizer())
+lda = SklearnTopicModels(n_components=10)
+lda.fit_transform(df_sub)
+lda.model['vect'].feature_names
+topics = lda.get_topics()
+
+def print_topics(dict_like):
+    for topic, terms in dict_like.items():
+        print(f'Topic {topic+1}')
+        print(terms)
+
+print_topics(topics)
 
 pipe = Pipeline(steps=[
     ('feat_trans', FeatureEngTransformer())
@@ -388,6 +454,19 @@ hierarchy_pipe = Pipeline(steps=[
     ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
     ,('clusters', HierarchicalClusters() )
 ])
+
+hierarchy_pipe.fit(df_sub)
+clusters = hierarchy_pipe.transform(df_sub)
+hierarchy_pipe['clusters'].children
+children = hierarchy_pipe.named_steps['clusters'].children
+children[:][0]
+plot_dendrogram(children)
+# labels = hierarchy_pipe['clusters'].y # This is the the same as the clusters above. Therefore its not needed
+
+df_sub['predictions_hierarchy'] = clusters
+df_sub[df_sub.predictions_hierarchy==0].issue.value_counts()
+df_sub[df_sub.predictions_hierarchy==1].issue.value_counts()
+
 # df_sub_xprime.issue.value_counts() # using this to gauge number of distinct clusters present; we'll use 10 for starters
 # df_sub[df_sub.predictions == 0]['issue'].value_counts()
 
