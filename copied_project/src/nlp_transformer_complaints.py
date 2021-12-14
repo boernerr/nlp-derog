@@ -3,6 +3,7 @@ import re
 import os
 import pandas as pd
 import unicodedata
+import textblob
 
 import nltk
 import nltk.cluster.util
