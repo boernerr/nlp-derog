@@ -3,11 +3,12 @@ import re
 import os
 import pandas as pd
 import unicodedata
-import textblob
+# import textblob
 
 import nltk
 import nltk.cluster.util
-from nltk import pos_tag, wordpunct_tokenize
+from collections import defaultdict
+from nltk import pos_tag, wordpunct_tokenize, CFG
 from nltk.cluster import KMeansClusterer
 from nltk.corpus import wordnet as wn
 from nltk.corpus.reader.api import CorpusReader
@@ -21,7 +22,7 @@ from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
 from sklearn.base import BaseEstimator,TransformerMixin, clone
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.decomposition import LatentDirichletAllocation, TruncatedSVD, NMF
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
@@ -383,13 +384,19 @@ class HierarchicalClusters( BaseEstimator, TransformerMixin):
 class SklearnTopicModels():
     '''Class that wraps an LDA model in a pipeline.'''
 
-    def __init__(self, n_components=10):
+    def __init__(self, n_components=10, estimator='LDA'):
         self.n_components = n_components
+        if estimator.upper() == 'LDA':
+            self.estimator = LatentDirichletAllocation(n_components=self.n_components)
+        elif estimator == 'NMF':
+            self.estimator = NMF(n_components=self.n_topics)
+        else:
+            self.estimator = TruncatedSVD(n_components=self.n_components)
         self.model = Pipeline([
             ('norm', TextNormalizer('consumer_complaint_narrative')),
             ('vect', TextCountVectorizer(text_col='consumer_complaint_narrative' #tokenizer=identity,
             )),
-            ('model', LatentDirichletAllocation(n_components=self.n_components))
+            ('model', self.estimator)
         ])
 
     def fit_transform(self, X):
@@ -410,31 +417,27 @@ class SklearnTopicModels():
 
         return topics
 
-
-
-base_format = FormatEstimator()
-df = base_format.df
-
-base_format.fit(df)
-df = base_format.transform(df)
-df_sub = df.loc[:100].copy()
-
-cv = TextCountVectorizer('consumer_complaint_narrative')
-vectorizer = CountVectorizer(input='content')
-XX = vectorizer.fit_transform(df_sub['consumer_complaint_narrative'])
-# vectorizer.get_feature_names()
-# help(CountVectorizer())
-lda = SklearnTopicModels(n_components=10)
-lda.fit_transform(df_sub)
-lda.model['vect'].feature_names
-topics = lda.get_topics()
-
 def print_topics(dict_like):
     for topic, terms in dict_like.items():
         print(f'Topic {topic+1}')
         print(terms)
 
-print_topics(topics)
+base_format = FormatEstimator()
+df = base_format.df
+
+# base_format.fit(df)
+df = base_format.fit_transform(df)
+df_sub = df.loc[:100].copy()
+
+# LDA model:
+# lda = SklearnTopicModels(n_components=10, estimator='lsa')
+# lda.fit_transform(df_sub)
+# lda.model['vect'].feature_names
+# topics = lda.get_topics()
+# print_topics(topics)
+
+
+
 
 pipe = Pipeline(steps=[
     ('feat_trans', FeatureEngTransformer())
@@ -468,41 +471,22 @@ df_sub['predictions_hierarchy'] = clusters
 df_sub[df_sub.predictions_hierarchy==0].issue.value_counts()
 df_sub[df_sub.predictions_hierarchy==1].issue.value_counts()
 
-# df_sub_xprime.issue.value_counts() # using this to gauge number of distinct clusters present; we'll use 10 for starters
-# df_sub[df_sub.predictions == 0]['issue'].value_counts()
+# From textbook ch.7; Context Free Grammar:
+GRAMMAR = """
+ S -> NNP VP
+ VP -> V PP
+ PP -> P NP
+ NP -> DT N
+ NNP -> 'Gwen' | 'George'
+ V -> 'looks' | 'burns'
+ P -> 'in' | 'for'
+ DT -> 'the'
+ N -> 'castle' | 'ocean'
+ """
+cfg = CFG.fromstring(GRAMMAR)
+print(cfg)
 
+from nltk.chunk.regexp import RegexpParser
+GRAMMAR = r'KT: {(<JJ>* <NN.*>+ <IN>)? <JJ>* <NN.*>+}'
+chunker = RegexpParser(GRAMMAR)
 
-########################################################################################################################
-# Below is analysis of pronoun extraction
-########################################################################################################################
-
-# Assume first_person MEMINCIDENTREPORT is about the author!
-first_person = xprime[xprime.pcnt_first_pron > .5]
-# first_person[first_person.CURTICKETAMOUNT >0].shape[0]/first_person.shape[0] # 2670 total, = 22% of all first_person
-# Of the first person records that have a ticket amount, I want to see if any are actually regarding a relative or friend and NOT the author.
-first_person_tkt_rela = first_person[(first_person.CURTICKETAMOUNT >0) & (first_person.cnt_immediate_rela > 0)] # idx regarding rela [6907, 21693, 37610]; 3/168 records are NOT about the author. Stands to reason these are ALL about the author
-first_person_tkt_frnd = first_person[(first_person.CURTICKETAMOUNT >0) & (first_person.cnt_frnd > 0 )] # idx regarding frnd [188, 21693]
-first_person_tkt_dstnt = first_person[(first_person.CURTICKETAMOUNT >0) & (first_person.cnt_dstnt_rela > 0 )] # all idx regarding author
-
-
-# Assume third_person MEMINCIDENTREPORT is about someone OTHER than the author!
-third_person = xprime[xprime.pcnt_first_pron < .25]
-
-third_person_tkt_rela = third_person[(third_person.CURTICKETAMOUNT >0) & (third_person.cnt_immediate_rela > 0)] # idx regarding rela []
-third_person_tkt_frnd = third_person[(third_person.CURTICKETAMOUNT >0) & (third_person.cnt_frnd > 0 )] # idx regarding frnd [1801, 6431, 8056]
-third_person_tkt_dstnt = third_person[(third_person.CURTICKETAMOUNT >0) & (third_person.cnt_dstnt_rela > 0 )] # only 2/4 are regarding author
-
-
-# Assume pronoun_na is about the author! After analysis, this holds up
-pronoun_na = xprime[xprime.pcnt_first_pron==0]
-pronoun_na[pronoun_na.CURTICKETAMOUNT >0].shape[0]/pronoun_na.shape[0] # 46%
-
-pron_na_wRelative = pronoun_na[(pronoun_na.cnt_immediate_rela > 0) | (pronoun_na.cnt_dstnt_rela > 0) | (pronoun_na.cnt_frnd > 0 )]
-pron_na_no_Relative = pronoun_na[(pronoun_na.cnt_immediate_rela == 0) & (pronoun_na.cnt_dstnt_rela == 0) & (pronoun_na.cnt_frnd == 0)]
-
-
-relative = xprime[(xprime.cnt_immediate_rela >0) | (xprime.cnt_dstnt_rela >0)]
-relative_high_count = relative[relative.cnt_immediate_rela>7]
-
-################################################################################################
-sample1 = pronoun_na.sample(frac=.1, random_state=0) ############################################ This is where I left off
