@@ -5,6 +5,7 @@ import pandas as pd
 import unicodedata
 # import textblob
 
+# import spacy
 import nltk
 import nltk.cluster.util
 from collections import defaultdict
@@ -16,8 +17,6 @@ from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk import sent_tokenize
 from nltk import wordpunct_tokenize
 from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
-
-
 
 from sklearn.base import BaseEstimator,TransformerMixin, clone
 from sklearn.cluster import KMeans
@@ -283,8 +282,6 @@ class TextCountVectorizer(BaseEstimator, TransformerMixin):
         X = vectorizer.fit_transform(X[self.text_col])
         self.feature_names = vectorizer.get_feature_names()
         return X
-
-
 
 class AssumptionLabelTransformer(BaseEstimator, TransformerMixin):
 
