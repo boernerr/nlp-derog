@@ -100,4 +100,10 @@ df = base_format.df
 
 # base_format.fit(df)
 df = base_format.fit_transform(df)
-df_sub = df.loc[:100].copy()
+df_sub = df.loc[:1000].copy()
+
+# df.columns: ['complaint_id', 'date_received', 'issue', 'sub_issue','consumer_complaint_narrative', 'state']
+
+df_phone = df[df.consumer_complaint_narrative.str.contains('phone')]
+# df_phone.issue.value_counts().plot(kind='barh')
+df.issue.value_counts()

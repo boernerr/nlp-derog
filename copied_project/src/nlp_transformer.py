@@ -9,6 +9,8 @@ import seaborn as sns
 import nltk
 import matplotlib.pyplot as plt
 
+from collections import defaultdict, Counter
+
 from nltk.corpus.reader.api import CorpusReader
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.cluster import KMeansClusterer
@@ -20,6 +22,7 @@ from sklearn.base import BaseEstimator,TransformerMixin, clone
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import  LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
@@ -27,7 +30,8 @@ from sklearn.metrics import accuracy_score, confusion_matrix, classification_rep
 from sklearn.model_selection import StratifiedKFold
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, MinMaxScaler, LabelEncoder, OrdinalEncoder
+from sklearn import tree
 
 from copied_project.src import DATA_PATH
 
@@ -397,6 +401,79 @@ class DownSamplerTransformer(BaseEstimator, TransformerMixin):
 
         return xprime
 
+class ColumnSelector(BaseEstimator, TransformerMixin):
+    '''Select only the columns to go to the next step. I'm assigning this functionality to an independent class because
+    I want to know exactly where in my pipeline I'm performing column selection. Otherwise, this step would be lost in some other
+    transform class and may be hard to find if errors occur down stream.'''
+
+    def __init__(self, column_list):
+        self.column_list = column_list
+
+    def fit(self, X, y=None):
+        '''y should be irrelevant here, we're only subselecting columns in transform(), i.e not really doing and transforms.'''
+        return self
+
+    def transform(self, X,  y=None):
+        '''We're just subselecting columns, NOT actually doing transforms on the data.'''
+        return X[self.column_list]
+
+class TextCountVectorizer(BaseEstimator, TransformerMixin):
+    '''Transformer class for vectorizing the data by implementing the CounterVectorizer() class from sklearn.
+    '''
+    def __init__(self, text_col, max_df=.95, min_df=20):
+        self.text_col = text_col
+        self.max_df = max_df
+        self.min_df = min_df
+
+    def fit(self, X):
+        return self
+
+    def transform(self, X, y=None):
+        '''max_df param removes words that occur > the percentage (or integer) supplied.
+        min_df param removes words that occur < the percentage (or integer) supplied.'''
+        vectorizer = CountVectorizer(input='content', max_df=self.max_df, min_df=self.min_df)
+
+        xprime = vectorizer.fit_transform(X[self.text_col])
+        self.feature_names = vectorizer.get_feature_names()
+        return xprime
+
+class StopWordExtractorTransformer(BaseEstimator, TransformerMixin):
+    '''Custom transformer class to create 'stopwords' relative to the input corpus. This is completed by first removing
+    generic stop words listed in nltk.corpus.stopwords. Then, a Counter() is used to simply count frequencies of all tokens
+    in the corpus. Tokens with the highest (n) frequency are returned as 'stopwords'!
+
+    There should be some kind of normalization step prior to instantiating this step. I.e. TextNormalizer():
+
+    sample_pipe = Pipeline([('normalize', TextNormalizer(text_col='__column__')),
+                 ('stop_words', StopWordExtractorTransformer(text_col='__column__'))])
+    '''
+
+    def __init__(self, text_col):
+        self.text_col = text_col
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        '''Return a Counter() obj with word frequencies.
+        '''
+        vocab_raw = X[self.text_col]
+        vocab_raw = [word for lst in vocab_raw for word in lst]
+        return Counter(vocab_raw)
+
+class EntityPairs(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        super(EntityPairs, self).__init__()
+
+    def pairs(self, document):
+        return list(itertools.permutations(set(document), 2))
+
+    def fit(self, documents, labels=None):
+        return self
+
+    def transform(self, documents):
+        return [self.pairs(document) for document in documents]
+
 
 # Estimator Classes
 class KMeansEstimator(BaseEstimator, TransformerMixin):
@@ -555,18 +632,107 @@ class TrainTestSplitWrapper():
                     self.iterate_clf = clf
             split += 1
 
+class SklearnTopicModels(BaseEstimator, TransformerMixin):
 
-class EntityPairs(BaseEstimator, TransformerMixin):
-    def __init__(self):
-        super(EntityPairs, self).__init__()
+    def __init__(self, txt_col='MEMINCIDENTREPORT', n_components=10):
+        """
+        n_components is the desired number of topics
+        """
+        self.n_components = n_components
+        self.txt_col = txt_col
+        self.model = Pipeline([
+        ('norm', TextNormalizer(text_col=self.txt_col)),
+        ('vect', CountVectorizer(input='content')), # Need to update this
+        ('model', LatentDirichletAllocation(n_components=self.n_components)),
+     ])
 
-    def pairs(self, document):
-        return list(itertools.permutations(set(document), 2))
+    def fit_transform(self, X, y=None):
+        self.model.fit_transform(X)
 
-    def fit(self, documents, labels=None):
-        return self
+        return self.model
 
-    def transform(self, documents):
-        return [self.pairs(document) for document in documents]
+    def get_topics(self, n=25):
+        vectorizer = self.model.named_steps['vect']
+        model = self.model.steps[-1][1]
+        names = vectorizer.feature_names
+        topics = dict()
+
+        for idx, topic in enumerate(model.components_):
+            features = topic.argsort()[: -(n - 1): -1]
+            tokens = [names[i] for i in features]
+            topics[idx] = tokens
+
+        return topics
+
+    @staticmethod
+    def print_topics(dictlike):
+        for topic, terms in dictlike.items():
+            print(f'topic: {topic}')
+            print(terms)
+
+class FbiTopicModels(SklearnTopicModels):
+    '''Class inheriting from our SklearnTopicModels(BaseEstimator, TransformerMixin) base class.
+    As such, this class contains a fit_transform() method, but not fit() or transform() as standalone funcs.
+
+    Params
+    ------
+    include_normalizer : bool
+        This is a convenience parameter in case the data has already been normalized from a previous step.
+        If data has already been normalized, include_normalizer should be set to: False.
+    n_components : int
+        The desired number of topics to output
+         '''
+
+    def __init__(self, include_normalizer=True, txt_col='MEMINCIDENTREPORT', n_components=7):
+        super().__init__()# n_components
+        self.topic_labels = None
+        self.txt_col = txt_col
+        self.n_components = n_components
+        self.max_df = .95
+        self.min_df = 20
+        self.random_state = 0
+        if not include_normalizer:
+            self.model = Pipeline([
+                ('vect', TextCountVectorizer(text_col=self.txt_col, max_df=self.max_df, min_df=self.min_df)),
+                ('model', LatentDirichletAllocation(n_components=self.n_components, random_state=self.random_state)),
+            ])
+        # This is the default pipeline
+        else:
+            self.model = Pipeline([
+            ('norm', TextNormalizer(text_col=self.txt_col)),
+            ('vect', TextCountVectorizer(text_col=self.txt_col, max_df=self.max_df, min_df=self.min_df)),
+            ('model', LatentDirichletAllocation(n_components=self.n_components, random_state=self.random_state)),
+         ])
+
+    def fit_transform(self, X, y=None):
+        xprime = X.copy() #maybe include this
+        self.topic_labels = self.model.fit_transform(xprime)
+        return self.model.fit_transform(xprime)
+        # return self.model
+
+    def assgn_topic_labels(self, df):
+
+        topics = [i.argmax() for i in self.topic_labels]
+        df['predicted_topic'] = topics
+
+    @staticmethod
+    def print_topics(dictlike):
+        for topic, terms in dictlike.items():
+            print(f'topic: {topic}')
+            print(terms)
+
+    def get_topics(self, n=25):
+        vectorizer = self.model.named_steps['vect']
+        model = self.model.steps[-1][1]
+        names = vectorizer.feature_names
+        topics = dict()
+
+        for idx, topic in enumerate(model.components_):
+            features = topic.argsort()[: -(n - 1): -1]
+            tokens = [names[i] for i in features]
+            topics[idx] = tokens
+
+        return topics
+
 
 
