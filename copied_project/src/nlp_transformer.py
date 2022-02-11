@@ -1,5 +1,6 @@
 import string
 import re
+import itertools
 import os
 import pandas as pd
 import unicodedata
@@ -555,92 +556,17 @@ class TrainTestSplitWrapper():
             split += 1
 
 
-# base_format = FormatEstimator()
-# df = base_format.df
-# base_format.fit(df)
-# df = base_format.fit_transform(df)
-#
-#
-# # Run the first pipeline which handles engineering all our features and assigning labels based on explicit conditions
-# feat_eng_pipe = Pipeline(steps=[
-#     ('feat_eng', FeatureEngTransformer())
-#     # ,('imputer', CustomImputer(strategy='most_frequent')) # This is giving issues... we are instead removing na rows in step 'feat_eng'
-#     ,('label', AssumptionLabelTransformer())
-# ])
-# df_labeled = feat_eng_pipe.fit_transform(df)
-# df_labeled.reset_index(inplace=True) # This step is necessary because we will join on df_labeled.index (after it's been reset)later on.
-#
-#
-# # Instantiate our DownSamplerTransformer class which takes a random sample from the population of df_labeled. The sample
-# # distribution of classes is determined by smpl_distr parameter
-# # ******* NOTE********
-# # This step should not be needed once we have trained the model. This was done to get a 'baseline' label for certain rows
-# # that met the explicit conditions for a certain categorization
-# sampler = DownSamplerTransformer()
-# sample =  sampler.transform(df_labeled, 'label', smpl_distr=sampler.baseline_weights) #sampler.baseline_weights
-# sample = sample[['TXTINCIDENTTYPE',  'has_fine', 'contains_author_OR_bureau',
-#                 'pcnt_first_pron', 'pcnt_poss_rela', 'cnt_immediate_rela', 'cnt_frnd' , 'label']]#
-#
-# sample.reset_index(inplace=True) # This is a necessary step because we will join the final output to sample.index
-#
-# # Our transformer pipeline which applies one hot encoding to our categorical features. Scaling of continuous features was
-# # previously used, but results are better without scaling
-# transformer_pipe = Pipeline(steps=[
-#     ('col_trans', ColumnTransformer([
-#         # ('scaler', MinMaxScaler(), ['cnt_immediate_rela', 'cnt_frnd']),
-#         ('ohe', OneHotEncoder(), ['TXTINCIDENTTYPE', 'has_fine', 'contains_author_OR_bureau'])], remainder='passthrough'))
-# ])
-#
-# transformed_sample = transformer_pipe.fit_transform(sample)
-#
-# transformer_pipe.named_steps['col_trans'].transformers[0][1].get_feature_names()
-# # Instantiating our train/test split and estimator class. This handles both train/test and predicting. Should actually split
-# # these into 2 separate classes
-# train_test = TrainTestSplitWrapper()
-# train_test.get_train_test_splits(transformed_sample, transformed_sample[:, -1], n_splits=4)
-#
-# # Printing out our clasifcation output metrics and confusion matrix
-# target_names = ['ABT YOU', 'SOMEONE ELSE', 'ABT RANDO'] #
-# train_test.best_tr_tst_dict['score']
-# train_test.confusion_matrix()
-# print(classification_report(train_test.best_tr_tst_dict['y_test_val'], train_test.best_tr_tst_dict['prediction'], target_names=target_names))
-#
-# # get the test idx and join predicted labels back variable=df_labeled to analyze. idx isn't correct!
-# test_idx = train_test.best_tr_tst_dict['X_test_idx']
-# # Set index of output to the test index
-# out_dict = dict(prediction=train_test.best_tr_tst_dict['prediction'], sample_idx= test_idx)
-# output = pd.DataFrame(out_dict, columns = ['prediction','sample_idx'], index=out_dict['sample_idx'])
-#
-# # First merge which backtracks the output(predictions) to the sample
-# merge1 = sample.merge(output, how='left',
-#                       left_on=sample.index,
-#                       right_on=output['sample_idx'])
-#
-# merge1 = merge1[['prediction', 'index']]
-#
-# merge2 = df_labeled.copy().merge(merge1,
-#                                  how='left',
-#                                  left_on=df_labeled.index,
-#                                  right_on=merge1['index'])
-#
-# merge2 = merge2[merge2.prediction.notna()]
-# merge2.drop(columns=['key_0', 'index_x', 'index_y'], axis=1, inplace=True)
-#
-# # Reorder columns to make your life easier!
-# new_order = ['prediction', 'label', 'MEMINCIDENTREPORT'] + [i for i in merge2.columns.tolist() if i not in ['prediction','MEMINCIDENTREPORT','label']]
-# # This is the END RESULT, now checkout those predictions!
-# merge2 = merge2[new_order]
-#
-#
-# # Analysis of outputs
-# # Checking outputs based on confusion matrix:
-# predict_rando = merge2[merge2.prediction ==3]
-#
-# predict_SOMEONE_actual_rando = merge2[(merge2.prediction ==2) & (merge2.label==3)]
-#
-# predict_SOMEONE_actual_YOU = merge2[(merge2.prediction ==2) & (merge2.label==1)] # AFter review, these are almost ALL about SOMEONE YOU KNOW; prediction==2
-#
-#
-# df_unlbl = df.loc[feat_eng_pipe['label'].unlbl_idx].copy()
-# df_labeled.has_fine.value_counts()
-# df_test_sample50 = df_unlbl[:500]
+class EntityPairs(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        super(EntityPairs, self).__init__()
+
+    def pairs(self, document):
+        return list(itertools.permutations(set(document), 2))
+
+    def fit(self, documents, labels=None):
+        return self
+
+    def transform(self, documents):
+        return [self.pairs(document) for document in documents]
+
+

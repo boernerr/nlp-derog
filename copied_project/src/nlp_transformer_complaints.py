@@ -426,14 +426,6 @@ df = base_format.df
 df = base_format.fit_transform(df)
 df_sub = df.loc[:100].copy()
 
-# LDA model:
-# lda = SklearnTopicModels(n_components=10, estimator='lsa')
-# lda.fit_transform(df_sub)
-# lda.model['vect'].feature_names
-# topics = lda.get_topics()
-# print_topics(topics)
-
-
 
 
 pipe = Pipeline(steps=[

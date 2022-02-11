@@ -58,8 +58,8 @@ class KeyphraseExtractor(BaseEstimator, TransformerMixin):
         for sents in document:
             for sent in sents:
                 sent = self.normalize(sent)
-        if not sent:
-            continue
+            if not sent:
+                continue
         chunks = tree2conlltags(self.chunker.parse(sent))
         phrases = [
             " ".join(word for word, pos, chunk in group).lower()
@@ -104,4 +104,9 @@ class EntityExtractor(BaseEstimator, TransformerMixin):
             yield self.get_entities(document)
 
 
-400/16
+# rand_ser = pd.Series([np.random.randint(0,6) for i in range(20)])
+# # np.digitize(rand_ser, [0, 3, 4, 5])
+# dff = pd.DataFrame(rand_ser, columns=['rand_int'])
+# dff['bins'] = dff.rand_int.apply(lambda x: np.digitize(x, [0, 3, 4, 5]))
+
+from keras.layers import Dense
