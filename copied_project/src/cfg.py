@@ -6,7 +6,7 @@ from nltk.chunk.regexp import RegexpParser
 from sklearn.base import BaseEstimator,TransformerMixin
 from unicodedata import category as unicat
 
-
+# From textbook ch.7; Context Free Grammar:
 GRAMMAR = """
  S -> NNP VP
  VP -> V PP

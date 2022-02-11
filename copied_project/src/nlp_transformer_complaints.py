@@ -459,23 +459,3 @@ plot_dendrogram(children)
 df_sub['predictions_hierarchy'] = clusters
 df_sub[df_sub.predictions_hierarchy==0].issue.value_counts()
 df_sub[df_sub.predictions_hierarchy==1].issue.value_counts()
-
-# From textbook ch.7; Context Free Grammar:
-GRAMMAR = """
- S -> NNP VP
- VP -> V PP
- PP -> P NP
- NP -> DT N
- NNP -> 'Gwen' | 'George'
- V -> 'looks' | 'burns'
- P -> 'in' | 'for'
- DT -> 'the'
- N -> 'castle' | 'ocean'
- """
-cfg = CFG.fromstring(GRAMMAR)
-print(cfg)
-
-from nltk.chunk.regexp import RegexpParser
-GRAMMAR = r'KT: {(<JJ>* <NN.*>+ <IN>)? <JJ>* <NN.*>+}'
-chunker = RegexpParser(GRAMMAR)
-

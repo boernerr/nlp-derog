@@ -17,32 +17,9 @@ from importlib import reload
 
 from copied_project.src import _util_plot_funcs as utilf
 from copied_project.src import DATA_PATH
-from copied_project.src import text_normalizer
-reload(text_normalizer)
-
-file = r'C:\Users\Robert\Downloads\complaints-2021-08-30_12_09.csv'
-# complaints_entire = pd.read_csv(file)
-# complaints_entire = format_df(complaints_entire)
-# complaints_entire.to_csv(os.path.join(DATA_PATH,'raw',os.path.basename(file)), index=False)
-complaints = pd.read_csv(file)
-# complaints.Issue.value_counts()
-
-def convert_to_underscore(stringList):
-    newList = []
-    for string in stringList:
-        # Convert spaces(' ') and dashes('-') to '_'
-        newList.append(re.sub(' |-','_',string).lower())
-    return newList
-
-def format_df(df):
-    new_col = convert_to_underscore(df.columns)
-    df.rename(columns=dict(zip(df.columns, new_col)), inplace=True)
-    return df
-
-complaints = format_df(complaints)
-complaints = complaints.loc[complaints.consumer_complaint_narrative.notna()][['date_received','issue','consumer_complaint_narrative']]
-complaints_subset = complaints.copy().loc[:100]
-
+from copied_project.src.nlp_transformer_complaints import TextNormalizer, FormatEstimator
+from copied_project.src import nlp_transformer_complaints
+# reload(nlp_transformer_complaints)
 
 class TextProcessor(CorpusReader,CategorizedCorpusReader): # holding these inherited classes for now, not sure if they actually are needed
 
@@ -118,45 +95,9 @@ class TextProcessor(CorpusReader,CategorizedCorpusReader): # holding these inher
             features[token] +=1
         return features
 
+base_format = FormatEstimator()
+df = base_format.df
 
-text = TextProcessor(complaints_subset, txt_col='consumer_complaint_narrative')
-df = text.df
-df.issue.value_counts()
-text.raw_corpus[0]
-# def distinct_tags():
-#     tags = []
-#     for item in df.pos[0]:
-#         if item[1] not in tags:
-#             tags.append(item[1] )
-#     return tags
-# tags = distinct_tags()
-textnorm = text_normalizer.TextNormalizer()
-df['lemmatized'] = df.consumer_complaint_narrative.apply(lambda x: textnorm.normalize(x))
-df['lemmatized'][96]
-
-vectorizer = CountVectorizer()# can use following argument for OneHotting: binary=True
-X = vectorizer.fit_transform(text.stem_corpus)
-print(vectorizer.get_feature_names())
-len(vectorizer.get_feature_names())
-
-tfidf = TfidfVectorizer()
-corpus = tfidf.fit_transform(text.stem_corpus)
-tfidf.get_feature_names()
-corpus.shape
-corpus[1]
-
-
-normalizer = text_normalizer.TextNormalizer()
-
-normalizer.lemmatize(df.pos[0][-2][0],df.pos[0][-2][1])
-lemma = nltk.WordNetLemmatizer()
-lemma.lemmatize('agreement',wn.NOUN)
-
-corpus = [
- "The elephant sneezed at the sight of potatoes.",
- "Bats can see via echolocation. See the bat sight sneeze!",
- "Wondering, she opened the door to the studio.",
-]
-sample_sent = '''I have a prepaid credit card with capital one. I always pay my bill on time, and my payment posts to my account and the money is taken from my bank.'''
-tokenized = text.corpus_tokenize(sample_sent)
-vectors = vectorizer.fit_transform(corpus)
+# base_format.fit(df)
+df = base_format.fit_transform(df)
+df_sub = df.loc[:100].copy()
