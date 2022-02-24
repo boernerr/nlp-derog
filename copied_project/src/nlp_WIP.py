@@ -12,13 +12,13 @@ from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
-from importlib import reload
+# from importlib import reload
 # import gensim
 
-from copied_project.src import _util_plot_funcs as utilf
+# from copied_project.src import _util_plot_funcs as utilf
 from copied_project.src import DATA_PATH
 from copied_project.src.nlp_transformer_complaints import TextNormalizer, FormatEstimator
-from copied_project.src import nlp_transformer_complaints
+# from copied_project.src import nlp_transformer_complaints
 # reload(nlp_transformer_complaints)
 
 class TextProcessor(CorpusReader,CategorizedCorpusReader): # holding these inherited classes for now, not sure if they actually are needed
@@ -100,10 +100,15 @@ df = base_format.df
 
 # base_format.fit(df)
 df = base_format.fit_transform(df)
-df_sub = df.loc[:1000].copy()
+df_sub = df.iloc[:100].copy()
+df_copy = df_sub.copy()
 
 # df.columns: ['complaint_id', 'date_received', 'issue', 'sub_issue','consumer_complaint_narrative', 'state']
 
 df_phone = df[df.consumer_complaint_narrative.str.contains('phone')]
 # df_phone.issue.value_counts().plot(kind='barh')
 df.issue.value_counts()
+
+import tensorflow
+
+add_to_path = r'C:\Users\Robert\AppData\Roaming\Python\Python37\Scripts'

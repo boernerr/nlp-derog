@@ -28,7 +28,7 @@ from sklearn.pipeline import Pipeline
 from copied_project.src import DATA_PATH
 from copied_project.src._util_plot_funcs import plot_dendrogram
 from copied_project.src import k_means_nlp
-from copied_project.src.kMeans_positions import KMeansEstimator
+# from copied_project.src.kMeans_positions import KMeansEstimator
 # from copied_project.src import text_normalizer
 # from importlib import reload
 # reload(text_normalizer)
@@ -419,43 +419,43 @@ def print_topics(dict_like):
         print(f'Topic {topic+1}')
         print(terms)
 
-base_format = FormatEstimator()
-df = base_format.df
-
-# base_format.fit(df)
-df = base_format.fit_transform(df)
-df_sub = df.loc[:100].copy()
-
-
-
-pipe = Pipeline(steps=[
-    ('feat_trans', FeatureEngTransformer())
-    ,('normalize', TextNormalizer('consumer_complaint_narrative'))
-    ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
-    # ,('kmeans', KMeansEstimator(k=3))# Not this kmeans estimator, for some reason it doesn't work correctly.
-    ,('kmeans',KMeansClusters(10) )
-])
-
-pipe.fit(df_sub)
-clusters = pipe.transform(df_sub)
-df_sub['predictions'] = clusters
-
-
-hierarchy_pipe = Pipeline(steps=[
-    ('feat_trans', FeatureEngTransformer())
-    ,('normalize', TextNormalizer('consumer_complaint_narrative'))
-    ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
-    ,('clusters', HierarchicalClusters() )
-])
-
-hierarchy_pipe.fit(df_sub)
-clusters = hierarchy_pipe.transform(df_sub)
-hierarchy_pipe['clusters'].children
-children = hierarchy_pipe.named_steps['clusters'].children
-children[:][0]
-plot_dendrogram(children)
-# labels = hierarchy_pipe['clusters'].y # This is the the same as the clusters above. Therefore its not needed
-
-df_sub['predictions_hierarchy'] = clusters
-df_sub[df_sub.predictions_hierarchy==0].issue.value_counts()
-df_sub[df_sub.predictions_hierarchy==1].issue.value_counts()
+# base_format = FormatEstimator()
+# df = base_format.df
+#
+# # base_format.fit(df)
+# df = base_format.fit_transform(df)
+# df_sub = df.loc[:100].copy()
+#
+#
+#
+# pipe = Pipeline(steps=[
+#     ('feat_trans', FeatureEngTransformer())
+#     ,('normalize', TextNormalizer('consumer_complaint_narrative'))
+#     ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
+#     # ,('kmeans', KMeansEstimator(k=3))# Not this kmeans estimator, for some reason it doesn't work correctly.
+#     ,('kmeans',KMeansClusters(10) )
+# ])
+#
+# pipe.fit(df_sub)
+# clusters = pipe.transform(df_sub)
+# df_sub['predictions'] = clusters
+#
+#
+# hierarchy_pipe = Pipeline(steps=[
+#     ('feat_trans', FeatureEngTransformer())
+#     ,('normalize', TextNormalizer('consumer_complaint_narrative'))
+#     ,('one_hot', OneHotVectorizer('consumer_complaint_narrative'))
+#     ,('clusters', HierarchicalClusters() )
+# ])
+#
+# hierarchy_pipe.fit(df_sub)
+# clusters = hierarchy_pipe.transform(df_sub)
+# hierarchy_pipe['clusters'].children
+# children = hierarchy_pipe.named_steps['clusters'].children
+# children[:][0]
+# plot_dendrogram(children)
+# # labels = hierarchy_pipe['clusters'].y # This is the the same as the clusters above. Therefore its not needed
+#
+# df_sub['predictions_hierarchy'] = clusters
+# df_sub[df_sub.predictions_hierarchy==0].issue.value_counts()
+# df_sub[df_sub.predictions_hierarchy==1].issue.value_counts()

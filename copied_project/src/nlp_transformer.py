@@ -10,7 +10,6 @@ import nltk
 import matplotlib.pyplot as plt
 
 from collections import defaultdict, Counter
-
 from nltk.corpus.reader.api import CorpusReader
 from nltk.corpus.reader.api import CategorizedCorpusReader
 from nltk.cluster import KMeansClusterer

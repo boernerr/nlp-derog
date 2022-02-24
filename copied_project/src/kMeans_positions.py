@@ -2,6 +2,7 @@ from os import path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 from sklearn.cluster import KMeans
 from sklearn.base import clone
