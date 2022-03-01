@@ -97,8 +97,6 @@ class TextProcessor(CorpusReader,CategorizedCorpusReader): # holding these inher
 
 base_format = FormatEstimator()
 df = base_format.df
-
-# base_format.fit(df)
 df = base_format.fit_transform(df)
 df_sub = df.iloc[:100].copy()
 df_copy = df_sub.copy()
